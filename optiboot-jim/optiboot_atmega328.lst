@@ -28,7 +28,7 @@ Disassembly of section .text:
     7e22:	14 be       	out	0x34, r1	; 52
     7e24:	81 ff       	sbrs	r24, 1
     7e26:	de d0       	rcall	.+444    	; 0x7fe4 <appStart>
-    7e28:	8d e0       	ldi	r24, 0x0D	; 13
+    7e28:	8e e0       	ldi	r24, 0x0E	; 14
     7e2a:	d6 d0       	rcall	.+428    	; 0x7fd8 <watchdogConfig>
     7e2c:	25 9a       	sbi	0x04, 5	; 4
     7e2e:	86 e0       	ldi	r24, 0x06	; 6

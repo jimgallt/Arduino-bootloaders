@@ -274,7 +274,8 @@ int main(void) {
   if (!(ch & _BV(EXTRF))) appStart();
 
   // Set up watchdog to trigger after 500ms
-  watchdogConfig(WATCHDOG_500MS);
+  //watchdogConfig(WATCHDOG_500MS);
+  watchdogConfig(WATCHDOG_1S);  // revised JGG to agree with optifix
 
   /* Set LED pin as output */
   LED_DDR |= _BV(LED);
