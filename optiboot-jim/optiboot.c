@@ -69,20 +69,6 @@
 #include <avr/pgmspace.h>
 #include <avr/boot.h>
 
-#define __boot_page_erase_short(address)        \
-(__extension__({                                 \
-    __asm__ __volatile__                         \
-    (                                            \
-        "out %0, %1\n\t"                         \
-        "spm\n\t"                                \
-        :                                        \
-        : "i" (_SFR_IO_ADDR(__SPM_REG)),        \
-          "r" ((uint8_t)__BOOT_PAGE_ERASE),      \
-          "z" ((uint16_t)address)                \
-    );                                           \
-}))
-
-
 //#define LED_DATA_FLASH
 
 #ifndef LED_START_FLASHES
@@ -187,6 +173,22 @@
 #define WATCHDOG_4S     (_BV(WDE3) | _BV(WDE))
 #define WATCHDOG_8S     (_BV(WDE3) | _BV(WDE0) | _BV(WDE))
 
+// --------------------------------------------------
+// code added from googlecode optiboot boot.h
+#define __boot_page_erase_short(address)        \
+(__extension__({                                 \
+    __asm__ __volatile__                         \
+    (                                            \
+        "out %0, %1\n\t"                         \
+        "spm\n\t"                                \
+        :                                        \
+        : "i" (_SFR_IO_ADDR(__SPM_REG)),        \
+          "r" ((uint8_t)__BOOT_PAGE_ERASE),      \
+          "z" ((uint16_t)address)                \
+    );                                           \
+}))
+// ------------------------------------------------
+
 /* Function Prototypes */
 /* The main function is in init9, which removes the interrupt vector table */
 /* we don't need. It is also 'naked', which means the compiler does not    */
@@ -205,6 +207,8 @@ void uartDelay() __attribute__ ((naked));
 #endif
 void appStart() __attribute__ ((naked));
 
+// --------------------------------------------------------
+// code added from code.google.com optiboot optiboot.c to address 32K sketch error
 #if defined(__AVR_ATmega168__)
 #define RAMSTART (0x100)
 #define NRWWSTART (0x3800)
@@ -235,6 +239,7 @@ void appStart() __attribute__ ((naked));
 #define rstVect (*(uint16_t*)(RAMSTART+SPM_PAGESIZE*2+4))
 #define wdtVect (*(uint16_t*)(RAMSTART+SPM_PAGESIZE*2+6))
 #endif
+// --------------------------------------------------------
 
 /* main program starts here */
 int main(void) {
@@ -315,6 +320,8 @@ int main(void) {
       putch(0x00);
     }
     
+// --------------------------------------------------------
+// code added from code.google.com optiboot optiboot.c to address 32K sketch error
     /* Write memory, length is big endian and is in bytes */
     else if(ch == STK_PROG_PAGE) {
       // PROGRAM PAGE - we support flash programming only, not EEPROM
@@ -341,7 +348,7 @@ int main(void) {
       // If only a partial page is to be programmed, the erase might not be complete.
       // So check that here
       boot_spm_busy_wait();
-
+// ---------------------------------------------------------
 
 #ifdef VIRTUAL_BOOT_PARTITION
       if ((uint16_t)(void*)address == 0) {
