@@ -69,6 +69,20 @@
 #include <avr/pgmspace.h>
 #include <avr/boot.h>
 
+#define __boot_page_erase_short(address)        \
+(__extension__({                                 \
+    __asm__ __volatile__                         \
+    (                                            \
+        "out %0, %1\n\t"                         \
+        "spm\n\t"                                \
+        :                                        \
+        : "i" (_SFR_IO_ADDR(__SPM_REG)),        \
+          "r" ((uint8_t)__BOOT_PAGE_ERASE),      \
+          "z" ((uint16_t)address)                \
+    );                                           \
+}))
+
+
 //#define LED_DATA_FLASH
 
 #ifndef LED_START_FLASHES
