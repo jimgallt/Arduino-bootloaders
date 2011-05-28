@@ -191,16 +191,37 @@ void uartDelay() __attribute__ ((naked));
 #endif
 void appStart() __attribute__ ((naked));
 
+#if defined(__AVR_ATmega168__)
+#define RAMSTART (0x100)
+#define NRWWSTART (0x3800)
+#elif defined(__AVR_ATmega328P__)
+#define RAMSTART (0x100)
+#define NRWWSTART (0x7000)
+#elif defined (__AVR_ATmega644P__)
+#define RAMSTART (0x100)
+#define NRWWSTART (0xE000)
+#elif defined(__AVR_ATtiny84__)
+#define RAMSTART (0x100)
+#define NRWWSTART (0x0000)
+#elif defined(__AVR_ATmega1280__)
+#define RAMSTART (0x200)
+#define NRWWSTART (0xE000)
+#elif defined(__AVR_ATmega8__) || defined(__AVR_ATmega88__)
+#define RAMSTART (0x100)
+#define NRWWSTART (0x1800)
+#endif
+
 /* C zero initialises all global variables. However, that requires */
 /* These definitions are NOT zero initialised, but that doesn't matter */
 /* This allows us to drop the zero init code, saving us memory */
-#define buff    ((uint8_t*)(0x100))
-#define address (*(uint16_t*)(0x200))
-#define length  (*(uint8_t*)(0x202))
+#define buff    ((uint8_t*)(RAMSTART))
+#define address (*(uint16_t*)(RAMSTART+SPM_PAGESIZE*2))
+#define length  (*(uint8_t*)(RAMSTART+SPM_PAGESIZE*2+2))
 #ifdef VIRTUAL_BOOT_PARTITION
-#define rstVect (*(uint16_t*)(0x204))
-#define wdtVect (*(uint16_t*)(0x206))
+#define rstVect (*(uint16_t*)(RAMSTART+SPM_PAGESIZE*2+4))
+#define wdtVect (*(uint16_t*)(RAMSTART+SPM_PAGESIZE*2+6))
 #endif
+
 /* main program starts here */
 int main(void) {
   // After the zero init loop, this is the first code to run.
@@ -279,7 +300,8 @@ int main(void) {
       getNch(4);
       putch(0x00);
     }
-    /* Write memory, length is big endian and is in bytes  */
+    
+    /* Write memory, length is big endian and is in bytes */
     else if(ch == STK_PROG_PAGE) {
       // PROGRAM PAGE - we support flash programming only, not EEPROM
       uint8_t *bufPtr;
@@ -287,13 +309,17 @@ int main(void) {
 
       getLen();
 
-      // Immediately start page erase - this will 4.5ms
-      boot_page_erase((uint16_t)(void*)address);
-
+      // If we are in RWW section, immediately start page erase
+      if (address < NRWWSTART) __boot_page_erase_short((uint16_t)(void*)address);
+      
       // While that is going on, read in page contents
       bufPtr = buff;
       do *bufPtr++ = getch();
       while (--length);
+
+      // If we are in NRWW section, page erase has to be delayed until now.
+      // Todo: Take RAMPZ into account
+      if (address >= NRWWSTART) __boot_page_erase_short((uint16_t)(void*)address);
 
       // Read command terminator, start reply
       verifySpace();
@@ -301,6 +327,7 @@ int main(void) {
       // If only a partial page is to be programmed, the erase might not be complete.
       // So check that here
       boot_spm_busy_wait();
+
 
 #ifdef VIRTUAL_BOOT_PARTITION
       if ((uint16_t)(void*)address == 0) {
