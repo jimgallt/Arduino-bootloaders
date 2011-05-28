@@ -62,6 +62,10 @@
 /* Licence can be viewed at                               */
 /* http://www.fsf.org/licenses/gpl.txt                    */
 /*                                                        */
+/* This version of optiboot.c modified by Jim Gallt       */
+/* and it is purely experimental.  So please don't        */
+/* assume anything in it is correct!                      */
+/*                                                        */ 
 /**********************************************************/
 
 #include <inttypes.h>
@@ -175,7 +179,7 @@
 
 // --------------------------------------------------
 // code added from googlecode optiboot boot.h
-#define __boot_page_erase_short(address)        \
+#define boot_page_erase_short(address)        \
 (__extension__({                                 \
     __asm__ __volatile__                         \
     (                                            \
@@ -199,7 +203,7 @@ uint8_t getch(void);
 static inline void getNch(uint8_t); /* "static inline" is a compiler hint to reduce code size */
 void verifySpace();
 static inline void flash_led(uint8_t);
-uint8_t getLen();
+//uint8_t getLen();
 static inline void watchdogReset();
 void watchdogConfig(uint8_t x);
 #ifdef SOFT_UART
@@ -233,8 +237,8 @@ void appStart() __attribute__ ((naked));
 /* These definitions are NOT zero initialised, but that doesn't matter */
 /* This allows us to drop the zero init code, saving us memory */
 #define buff    ((uint8_t*)(RAMSTART))
-#define address (*(uint16_t*)(RAMSTART+SPM_PAGESIZE*2))
-#define length  (*(uint8_t*)(RAMSTART+SPM_PAGESIZE*2+2))
+// #define address (*(uint16_t*)(RAMSTART+SPM_PAGESIZE*2))
+// #define length  (*(uint8_t*)(RAMSTART+SPM_PAGESIZE*2+2))
 #ifdef VIRTUAL_BOOT_PARTITION
 #define rstVect (*(uint16_t*)(RAMSTART+SPM_PAGESIZE*2+4))
 #define wdtVect (*(uint16_t*)(RAMSTART+SPM_PAGESIZE*2+6))
@@ -243,6 +247,16 @@ void appStart() __attribute__ ((naked));
 
 /* main program starts here */
 int main(void) {
+
+// --------------------------------- from optifix by westfw
+    /*
+     * Making these local and in registers prevents the need for initializing
+     * them, and also saves space because code no longer stores to memory.
+     */
+    register uint16_t address;
+    register uint8_t  length;
+// ------------------------------------------
+
   // After the zero init loop, this is the first code to run.
   //
   // This code makes the following assumptions:
@@ -253,6 +267,13 @@ int main(void) {
   // If not, uncomment the following instructions:
   // cli();
   // SP=RAMEND;  // This is done by hardware reset
+
+// --------------------------------- from optifix by westfw
+#ifdef __AVR_ATmega8__
+  SP=RAMEND;  // This is done by hardware reset
+#endif
+// --------------------------------------------------------
+  
   asm volatile ("clr __zero_reg__");
 
   uint8_t ch;
@@ -308,12 +329,18 @@ int main(void) {
       // SET DEVICE EXT is ignored
       getNch(5);
     }
+
+// ---------------------------------- taken from optifix by westfw
     else if(ch == STK_LOAD_ADDRESS) {
       // LOAD ADDRESS
-      address = getch();
-      address = (address & 0xff) | (getch() << 8);
-      address += address; // Convert from word address to byte address
+      uint16_t newAddress;
+      newAddress = getch();
+      newAddress = (newAddress & 0xff) | (getch() << 8);
+      newAddress += newAddress; // Convert from word address to byte address
+      address = newAddress;
       verifySpace();
+// ------------------------------------------------------
+
     }
     else if(ch == STK_UNIVERSAL) {
       // UNIVERSAL command is ignored
@@ -329,10 +356,12 @@ int main(void) {
       uint8_t *bufPtr;
       uint16_t addrPtr;
 
-      getLen();
+      getch();
+      length = getch();
+      getch();
 
       // If we are in RWW section, immediately start page erase
-      if (address < NRWWSTART) __boot_page_erase_short((uint16_t)(void*)address);
+      if (address < NRWWSTART) boot_page_erase_short((uint16_t)(void*)address);
       
       // While that is going on, read in page contents
       bufPtr = buff;
@@ -341,7 +370,7 @@ int main(void) {
 
       // If we are in NRWW section, page erase has to be delayed until now.
       // Todo: Take RAMPZ into account
-      if (address >= NRWWSTART) __boot_page_erase_short((uint16_t)(void*)address);
+      if (address >= NRWWSTART) boot_page_erase_short((uint16_t)(void*)address);
 
       // Read command terminator, start reply
       verifySpace();
@@ -395,7 +424,11 @@ int main(void) {
     /* Read memory block mode, length is big endian.  */
     else if(ch == STK_READ_PAGE) {
       // READ PAGE - we only read flash
-      getLen();
+
+      getch();
+      length = getch();
+      getch();
+
       verifySpace();
 #ifdef VIRTUAL_BOOT_PARTITION
       do {
@@ -550,11 +583,12 @@ void flash_led(uint8_t count) {
 }
 #endif
 
-uint8_t getLen() {
-  getch();
-  length = getch();
-  return getch();
-}
+// this function removed for consistency with optifix
+//uint8_t getLen() {  
+//  getch();
+//  length = getch();
+//  return getch();
+//}
 
 // Watchdog functions. These are only safe with interrupts turned off.
 void watchdogReset() {
